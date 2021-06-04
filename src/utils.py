@@ -66,7 +66,10 @@ def vec_normalize(i):
     """
     Scale a vector such that its magnitude is 1.
     @param i: (tuple) 3d vector to normalize.
+    @returns: (tuple) of normalized i, or the zero vector if i is the zero vector
     """
+    if not any(i):
+        return i # i is the zero vector
     x, y, z = i
     mag = sqrt(x**2 + y**2 + z**2)
     i_norm = vec_mul(i, 1/mag)

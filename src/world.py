@@ -18,6 +18,7 @@ from config import *
 from utils import *
 
 import math
+from threading import Lock
 from pyglet import image
 from pyglet.graphics import TextureGroup, Batch
 from pyglet.gl import GL_QUADS
@@ -52,6 +53,12 @@ class World:
 
     def add_right_strafe(self):
         self.player.add_right_strafe()
+
+    def add_up_strafe(self):
+        self.player.add_up_strafe()
+
+    def remove_up_strafe(self):
+        self.player.remove_up_strafe()
 
     def add_player_rotn(self, horiz, vert):
         self.player.add_rotn(horiz, vert)
@@ -128,30 +135,38 @@ class Player:
         """
         Player rotation buffer. Rotation changes should be put here, then rotation is updated in the update method.
         """
-        self.strafe = [0, 0]
+        self.strafe = [0, 0, 0]
         """
         Player strafe.
         First element is forward strafe, 1 when moving forward, -1 when moving backward, and 0 otherwise.
         Second element is side strafe, -1 when moving left, +1 when moving right, and 0 otherwise.
+        Third element is vertical strafe (flying/jumping), -1 when flying down, 1 when flying up/jumping, 0 otherwise.
+        """
+        self.mutex = Lock()
+        """
+        Hold this mutex before modifying or using any fields of this class.
         """
 
     def get_vel(self):
         """
         Get the current player velocity.
-        @returns: (tuple) 3d vector of velocity as dx, dy, dz
+        @returns: (tuple) normalized 3d vector of velocity as dx, dy, dz
         """
-        strafe_fwd, strafe_side = self.strafe
+        with self.mutex:
+            strafe_fwd, strafe_side, strafe_up = self.strafe
 
         sight_vec = self.get_sight_vec()
         fwd_vel = vec_mul(sight_vec, strafe_fwd)
-        fwd_vel = (fwd_vel[0], 0, fwd_vel[2]) # make vertical element 0 so we dont float up
+        fwd_vel = (fwd_vel[0], 0, fwd_vel[2]) # make vertical velocity 0 so we dont float up when looking upward
 
         right_vec = vec_ortho(sight_vec) # points to the right of sight vector on the horizontal plane
         side_vel = vec_mul(right_vec, strafe_side)
 
-        vel = vec_add(fwd_vel, side_vel)
-        if any(vel):
-            vel = vec_normalize(vel) # if there is velocity, normalize it
+        up_vec = (0, 1, 0) # points straight up
+        up_vel = vec_mul(up_vec, strafe_up)
+
+        vel = vec_add(vec_add(fwd_vel, side_vel), up_vel)
+        vel = vec_normalize(vel) # if there is velocity, normalize it
         return vel
 
     def get_sight_vec(self):
@@ -159,7 +174,8 @@ class Player:
         Return a 3d unit vector that points where the player is looking.
         @return: (tuple) of x, y, z of player sight vector.
         """
-        horiz_rotn, vert_rotn = self.rotn
+        with self.mutex:
+            horiz_rotn, vert_rotn = self.rotn
         x = math.sin(math.radians(horiz_rotn))
         y = math.sin(math.radians(vert_rotn))
         z = math.cos(math.radians(horiz_rotn))
@@ -176,8 +192,9 @@ class Player:
         Note vertical rotation is clamped to 90 and -90, it cannot exceed that. And horizontal rotation wraps around at
         180 and -180 degrees (backwards facing).
         """
-        old_horiz, old_vert = self.rotn_buf
-        self.rotn_buf = (old_horiz+horiz, old_vert+vert)
+        with self.mutex:
+            old_horiz, old_vert = self.rotn_buf
+            self.rotn_buf = (old_horiz+horiz, old_vert+vert)
 
     def update(self, dt):
         """
@@ -194,42 +211,56 @@ class Player:
         """
         d = dt * FLYING_SPEED # distance covered since the last update
         vel = vec_mul(self.get_vel(), d) # scale velocity for distance
-        self.posn = vec_add(self.posn, vel) # adjust position with velocity
+        with self.mutex:
+            self.posn = vec_add(self.posn, vel) # adjust position with velocity
 
 
     def update_rotn(self):
         """
         Add buffered rotation changes into the player rotation.
         """
-        old_horiz, old_vert = self.rotn
-        horiz_add, vert_add = self.rotn_buf
-        self.rotn_buf = (0, 0)
-        new_horiz = old_horiz + horiz_add
-        new_vert = old_vert + vert_add
+        with self.mutex:
+            old_horiz, old_vert = self.rotn
+            horiz_add, vert_add = self.rotn_buf
+            self.rotn_buf = (0, 0)
+            new_horiz = old_horiz + horiz_add
+            new_vert = old_vert + vert_add
 
-        # clamp vertical rotn
-        if new_vert > 90:
-            new_vert = 90
-        elif new_vert < -90:
-            new_vert = -90
-        # wrap horiz rotn around
-        if new_horiz >= 180:
-            extra_rotn = new_horiz - 180
-            new_horiz = -180 + extra_rotn
-        elif new_horiz < -180:
-            extra_rotn = -180 - new_horiz 
-            new_horiz = 180 - extra_rotn
+            # clamp vertical rotn
+            if new_vert > 90:
+                new_vert = 90
+            elif new_vert < -90:
+                new_vert = -90
+            # wrap horiz rotn around
+            if new_horiz >= 180:
+                extra_rotn = new_horiz - 180
+                new_horiz = -180 + extra_rotn
+            elif new_horiz < -180:
+                extra_rotn = -180 - new_horiz 
+                new_horiz = 180 - extra_rotn
 
-        self.rotn = (new_horiz, new_vert)
+            self.rotn = (new_horiz, new_vert)
 
     def add_forward_strafe(self):
-        self.strafe[0] += 1
+        with self.mutex:
+            self.strafe[0] += 1
     
     def add_backward_strafe(self):
-        self.strafe[0] -= 1
+        with self.mutex:
+            self.strafe[0] -= 1
     
     def add_left_strafe(self):
-        self.strafe[1] -= 1
+        with self.mutex:
+            self.strafe[1] -= 1
 
     def add_right_strafe(self):
-        self.strafe[1] += 1
+        with self.mutex:
+            self.strafe[1] += 1
+
+    def add_up_strafe(self):
+        with self.mutex:
+            self.strafe[2] += 1
+
+    def remove_up_strafe(self):
+        with self.mutex:
+            self.strafe[2] -= 1

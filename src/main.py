@@ -69,6 +69,10 @@ class Window(pyglet.window.Window):
             self.world.add_left_strafe()
         elif symbol == key.D:
             self.world.add_right_strafe()
+        elif symbol == key.SPACE:
+            self.world.add_up_strafe()
+        elif symbol == key.F:
+            self.world.remove_up_strafe()
         elif symbol == key.ESCAPE:
             self.set_mcap(False)
 
@@ -87,6 +91,10 @@ class Window(pyglet.window.Window):
             self.world.add_right_strafe()
         elif symbol == key.D:
             self.world.add_left_strafe()
+        elif symbol == key.SPACE:
+            self.world.remove_up_strafe()
+        elif symbol == key.F:
+            self.world.add_up_strafe()
 
     def on_resize(self, width, height):
         """

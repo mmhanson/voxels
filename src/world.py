@@ -39,8 +39,7 @@ class World:
         Called every frame.
         @param dt: float of the time passed since the last update
         """
-        self.player.update_rotn()
-        self.player.update_posn(dt)
+        self.player.update(dt)
 
     def add_forward_strafe(self):
         self.player.add_forward_strafe()
@@ -167,16 +166,6 @@ class Player:
         z *= -1 # since negative z points outward from the camera
         sight_vec = vec_normalize((x, y, z))
         return sight_vec
-
-    def update_posn(self, dt):
-        """
-        Update the player position.
-        @param dt: (float) The change in time since the last update.
-        """
-        d = dt * FLYING_SPEED # distance covered since the last update
-        vel = vec_mul(self.get_vel(), d) # scale velocity for distance
-        self.posn = vec_add(self.posn, vel) # adjust position with velocity
-
     def add_rotn(self, horiz, vert):
         """
         Add to the player rotation.
@@ -189,6 +178,24 @@ class Player:
         """
         old_horiz, old_vert = self.rotn_buf
         self.rotn_buf = (old_horiz+horiz, old_vert+vert)
+
+    def update(self, dt):
+        """
+        Update player position and rotation.
+        @param dt: (float) the change in time since the last update.
+        """
+        self.update_posn(dt)
+        self.update_rotn()
+
+    def update_posn(self, dt):
+        """
+        Update the player position.
+        @param dt: (float) The change in time since the last update.
+        """
+        d = dt * FLYING_SPEED # distance covered since the last update
+        vel = vec_mul(self.get_vel(), d) # scale velocity for distance
+        self.posn = vec_add(self.posn, vel) # adjust position with velocity
+
 
     def update_rotn(self):
         """

@@ -18,6 +18,7 @@ from config import *
 from utils import *
 
 import math
+from random import randint, choice
 from threading import Lock
 from pyglet import image
 from pyglet.graphics import TextureGroup, Batch
@@ -95,13 +96,45 @@ class Map:
 
     def generate(self):
         # 3d plus shape at origin
-        self.add_block((0, 0, 0), GRASS) # origin
-        self.add_block((0, 1, 0), GRASS) # on top of origin
-        self.add_block((0, -1, 0), GRASS) # on bottom of origin
-        self.add_block((1, 0, 0), GRASS) # west of origin
-        self.add_block((-1, 0, 0), GRASS) # east of origin
-        self.add_block((0, 0, 1), GRASS) # south of origin
-        self.add_block((0, 0, -1), GRASS) # north of origin
+        #self.add_block((0, 0, 0), GRASS) # origin
+        #self.add_block((0, 1, 0), GRASS) # on top of origin
+        #self.add_block((0, -1, 0), GRASS) # on bottom of origin
+        #self.add_block((1, 0, 0), GRASS) # west of origin
+        #self.add_block((-1, 0, 0), GRASS) # east of origin
+        #self.add_block((0, 0, 1), GRASS) # south of origin
+        #self.add_block((0, 0, -1), GRASS) # north of origin
+        n = 80  # 1/2 width and height of world
+        s = 1  # step size
+        y = 0  # initial y height
+        for x in range(-n, n + 1, s):
+            for z in range(-n, n + 1, s):
+                # create a layer stone an grass everywhere.
+                self.add_block((x, y - 2, z), GRASS)
+                self.add_block((x, y - 3, z), STONE)
+                if x in (-n, n) or z in (-n, n):
+                    # create outer walls.
+                    for dy in range(-2, 3):
+                        self.add_block((x, y + dy, z), STONE)
+
+        # generate the hills randomly
+        o = n - 10
+        for _ in range(120):
+            a = randint(-o, o)  # x position of the hill
+            b = randint(-o, o)  # z position of the hill
+            c = -1  # base of the hill
+            h = randint(1, 6)  # height of the hill
+            s = randint(4, 8)  # 2 * s is the side length of the hill
+            d = 1  # how quickly to taper off the hills
+            t = choice([GRASS, SAND, BRICK])
+            for y in range(c, c + h):
+                for x in range(a - s, a + s + 1):
+                    for z in range(b - s, b + s + 1):
+                        if (x - a) ** 2 + (z - b) ** 2 > (s + 1) ** 2:
+                            continue
+                        if (x - 0) ** 2 + (z - 0) ** 2 < 5 ** 2:
+                            continue
+                        self.add_block((x, y, z), t)
+                s -= d  # decrement side length so hills taper off
 
     def add_block(self, position, texture):
         self.blocks[position] = texture
@@ -127,7 +160,7 @@ class Player:
         self.rotn = (0, 0)
         """
         Player rotation.
-        First value is horizntal rotation, rom -180 to _180.
+        First value is horizntal rotation, from -180 to _180.
         Second value is vertical rotation, from -90 to +90.
         Horizontal rotation wraps but vertical rotation doesnt.
         """
@@ -182,6 +215,7 @@ class Player:
         z *= -1 # since negative z points outward from the camera
         sight_vec = vec_normalize((x, y, z))
         return sight_vec
+
     def add_rotn(self, horiz, vert):
         """
         Add to the player rotation.

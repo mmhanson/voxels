@@ -24,6 +24,9 @@ from pyglet.gl import GL_QUADS
 
 
 class World:
+    """
+    Provides a single interface to all submodel classes.
+    """
     def __init__(self):
         self.map = Map()
         self.player = Player()
@@ -69,12 +72,22 @@ class World:
 
 class Map:
     def __init__(self):
-        self.batch = Batch() # batch of vertices for all the blocks
+        self.batch = Batch()
+        """
+        Pyglet vertex batch for all blocks in the world.
+        """
         self.group = TextureGroup(image.load(TEXTURE_PATH).get_texture())
+        """
+        Pyglet texture group that stores our texture atlas.
+        Block textures are cropped from this atlas. It's more efficient than loading textures individually.
+        """
         self.blocks = {}
-        self._initialize()
+        """
+        Maps coordinates to the block that exists at that coordinate.
+        """
+        self.generate()
 
-    def _initialize(self):
+    def generate(self):
         # 3d plus shape at origin
         self.add_block((0, 0, 0), GRASS) # origin
         self.add_block((0, 1, 0), GRASS) # on top of origin
